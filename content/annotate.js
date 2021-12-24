@@ -1,11 +1,11 @@
 "use strict";
 
 // Begin namespace
-try{
 (async () => {
     // Canvas height: 1024 px at maximum.
     const CANVAS_MAX_HEIGHT = 256;
     const CSS_PREFIX = `_ANNOTATOR__`;
+    const Z_IDX_MAGNITUDE = 999999999999999;
     const CSS = `
         .${CSS_PREFIX}growBtn {
             color: white;
@@ -35,7 +35,7 @@ try{
             left: 0;
             right: 0;
             touch-action: pinch-zoom;
-            z-index: 9999999999999;
+            z-index: ${Z_IDX_MAGNITUDE};
         }
 
         .${CSS_PREFIX}canvasContainer {
@@ -43,7 +43,7 @@ try{
             top: 0;
             left: 0;
             right: 0;
-            z-index: -99999999;
+            z-index: -${Z_IDX_MAGNITUDE};
             display: flex;
             flex-direction: column;
         }
@@ -111,7 +111,7 @@ try{
                 x: x, y: y,
                 t: (new Date()).getTime(),
 
-                pressure: evt.pressure
+                pressure: evt.pressure || 0.6,
             };
         };
 
@@ -133,6 +133,12 @@ try{
                 let p1 = lastBuffer[1];
                 let p0 = lastBuffer[0];
 
+                let d0 = p0.pressure * lineWidth;
+                let d1 = p1.pressure * lineWidth;
+                let d2 = p2.pressure * lineWidth;
+                let d3 = p3.pressure * lineWidth;
+                let di = (d1 + d2) / 2.0;
+
                 let x0 = p0.x, x1 = p1.x, x2 = p2.x, x3 = p3.x;
                 let y0 = p0.y - ctxY,
                     y1 = p1.y - ctxY,
@@ -147,13 +153,19 @@ try{
 
                 ctx.beginPath();
                 if (isStart) {
-                    ctx.moveTo(x0, y0);
-                    ctx.lineTo(x1, y1);
+                    ctx.moveTo(x0 - d0, y0 - d0);
+                    ctx.lineTo(x1 - d1, y1 - d1);
                 } else {
-                    ctx.moveTo(x1, y1);
+                    ctx.moveTo(x1 - d1, y1 - d1);
                 }
-                ctx.bezierCurveTo(x1 + vx, y1 + vy, x2, y2, x3, y3);
-                ctx.stroke();
+
+                ctx.bezierCurveTo(x1 + vx - di, y1 + vy - di, x2 - d2, y2 - d2, x3 - d3, y3 - d3);
+
+                ctx.lineTo(x3 + d3, y3 + d3);
+                ctx.bezierCurveTo(x2 + d2, y2 + d2, x1 + vx + di, y1 + vy + di, x0 + d0, y0 + d0);
+                ctx.lineTo(x0 - d0, y0 - d0);
+
+                ctx.fill();
             };
 
             let lastCtx = null;
@@ -213,7 +225,7 @@ try{
 
             ctx.beginPath();
             ctx.fillStyle = lineColor;
-            ctx.arc(point.x, point.y - ctxY, lineWidth / 2.0, 0, Math.PI * 2, true);
+            ctx.arc(point.x, point.y - ctxY, lineWidth / 2.0 * point.pressure, 0, Math.PI * 2, true);
             ctx.fill();
         });
 
@@ -253,4 +265,3 @@ try{
     cssElem.appendChild(document.createTextNode(CSS));
     document.documentElement.appendChild(cssElem);
 })();
-} catch(e) { console.error(e); }
