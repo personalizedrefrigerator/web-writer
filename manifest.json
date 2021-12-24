@@ -1,0 +1,19 @@
+{
+    "manifest_version": 2,
+    "name": "Annotator",
+    "version": "0.1",
+
+    "description": "Write on websites!",
+
+    "icons": {
+        "48": "icons/icon.svg"
+    },
+
+    "browser_action": {
+        "default_icon": "icons/icon.svg",
+        "default_title": "Markup",
+        "default_popup": "popup/annotate.html"
+    },
+
+    "permissions": ["storage", "activeTab"]
+}
