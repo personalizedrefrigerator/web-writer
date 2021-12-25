@@ -18,5 +18,5 @@
         "scripts": ["background.js"]
     },
 
-    "permissions": ["storage", "activeTab"]
+    "permissions": ["storage", "activeTab", "<all_urls>"]
 }

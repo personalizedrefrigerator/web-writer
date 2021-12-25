@@ -4,6 +4,8 @@ try{
 
 // Begin namespace
 (async () => {
+    console.log("Starting up... " + location.href);
+
     // Canvas height: 1024 px at maximum.
     const CANVAS_MAX_HEIGHT = 256;
     const CSS_PREFIX = `_ANNOTATOR__`;
@@ -55,10 +57,10 @@ try{
     `;
 
     // Don't re-inject
-    if (window.__ANNOTATOR_SCRIPT_INJECTED) {
+    if (document.querySelector(`.${CSS_PREFIX}previewCanvas`)) {
+        console.log("Already running!");
         return;
     }
-    window.__ANNOTATOR_SCRIPT_INJECTED = true;
 
     /**
      * Ensure that the drawing context's internal width matches the
@@ -77,7 +79,6 @@ try{
     const annotateElement = function(element) {
         let mainContainer = document.createElement("div");
         let inputArea = element;//document.createElement("div");
-        //let svgContainer = document.createElement("div");
         let previewCanvas = document.createElement("canvas");
         let previewCtx = previewCanvas.getContext('2d');
         let pointersDown = {};
@@ -319,18 +320,9 @@ try{
             }
         });
 
-        //mainContainer.appendChild(inputArea);
         mainContainer.appendChild(previewCanvas);
         element.appendChild(mainContainer);
-
-        let height = element.clientHeight;
-        let main   = document.querySelector("main");
-
-        if (main) {
-            height = Math.max(main.clientHeight, height);
-        }
-
-        //inputArea.style.height = `${height}px`;
+        inputArea.style.touchAction = "pinch-zoom";
     };
 
     annotateElement(document.scrollingElement || document.documentElement);
