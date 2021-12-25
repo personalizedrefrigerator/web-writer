@@ -1,11 +1,14 @@
 "use strict";
 
+try{
+
 // Begin namespace
 (async () => {
     // Canvas height: 1024 px at maximum.
     const CANVAS_MAX_HEIGHT = 256;
     const CSS_PREFIX = `_ANNOTATOR__`;
     const Z_IDX_MAGNITUDE = 999999999999999;
+    const SVG_PADDING = 10;
     const CSS = `
         .${CSS_PREFIX}growBtn {
             color: white;
@@ -38,14 +41,16 @@
             z-index: ${Z_IDX_MAGNITUDE};
         }
 
-        .${CSS_PREFIX}canvasContainer {
-            position: absolute;
+        .${CSS_PREFIX}previewCanvas {
+            position: fixed;
             top: 0;
             left: 0;
             right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+
             z-index: -${Z_IDX_MAGNITUDE};
-            display: flex;
-            flex-direction: column;
         }
     `;
 
@@ -71,37 +76,19 @@
      */
     const annotateElement = function(element) {
         let mainContainer = document.createElement("div");
-        let inputArea = document.createElement("div");
-        let canvasContainer = document.createElement("div");
-        let drawingCtxs = [];
+        let inputArea = element;//document.createElement("div");
+        //let svgContainer = document.createElement("div");
+        let previewCanvas = document.createElement("canvas");
+        let previewCtx = previewCanvas.getContext('2d');
         let pointersDown = {};
         let lastBuffer = [];
         let lineColor = "red";
         let lineWidth = 2;
         let pointerDownCount = 0;
+        let svgPath = [];
 
         mainContainer.classList.add(`${CSS_PREFIX}mainContainer`);
-        canvasContainer.classList.add(`${CSS_PREFIX}canvasContainer`);
-
-        const addCanvas = () => {
-            let canvas = document.createElement("canvas");
-            canvas.width = element.clientWidth;
-            canvas.height = CANVAS_MAX_HEIGHT;
-
-            let ctx = canvas.getContext("2d");
-            drawingCtxs.push(ctx);
-
-            inputArea.style.height = `${drawingCtxs.length * CANVAS_MAX_HEIGHT}px`;
-
-            canvasContainer.appendChild(canvas);
-        };
-
-        /// Get the drawing context targeted by the given point.
-        const getCtx = (point) => {
-            let idx = Math.floor(point.y / CANVAS_MAX_HEIGHT);
-
-            return drawingCtxs[idx];
-        };
+        previewCanvas.classList.add(`${CSS_PREFIX}previewCanvas`);
 
         const getPoint = (evt) => {
             let x = evt.offsetX;
@@ -109,6 +96,7 @@
 
             return {
                 x: x, y: y,
+                clientX: evt.clientX, clientY: evt.clientY,
                 t: (new Date()).getTime(),
 
                 pressure: evt.pressure || 0.6,
@@ -117,8 +105,13 @@
 
         let isStart = false;
         const startLine = (point) => {
+            previewCanvas.style.display = "block";
+            resizeCanvas(previewCanvas);
+            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+
             lastBuffer = [];
             isStart = true;
+            svgPath = [];
         };
 
         const continueLine = (point) => {
@@ -127,7 +120,7 @@
                 return;
             }
 
-            const draw = (ctx, ctxY) => {
+            const draw = (ctx, ctxX, ctxY) => {
                 let p3 = lastBuffer[3];
                 let p2 = lastBuffer[2];
                 let p1 = lastBuffer[1];
@@ -140,10 +133,10 @@
                 let di = (d1 + d2) / 2.0;
 
                 let x0 = p0.x, x1 = p1.x, x2 = p2.x, x3 = p3.x;
-                let y0 = p0.y - ctxY,
-                    y1 = p1.y - ctxY,
-                    y2 = p2.y - ctxY,
-                    y3 = p3.y - ctxY;
+                let y0 = p0.y,
+                    y1 = p1.y,
+                    y2 = p2.y,
+                    y3 = p3.y;
 
                 let vx = (x1 - x0) / (p1.t - p0.t);
                 let vy = (y1 - y0) / (p1.t - p0.t);
@@ -151,50 +144,142 @@
                 vx *= 0.5 * (p2.t - p1.t);
                 vy *= 0.5 * (p2.t - p1.t);
 
+                const moveTo = (x, y) => {
+                    ctx.moveTo(x - ctxX, y - ctxY);
+                    svgPath.push(['M', [[x, y]]]);
+                };
+
+                const lineTo = (x, y) => {
+                    ctx.lineTo(x - ctxX, y - ctxY);
+                    svgPath.push([`L`, [[x, y]]]);
+                };
+
+                const curveTo = (x1, y1, x2, y2, x3, y3) => {
+                    ctx.bezierCurveTo(x1 - ctxX, y1 - ctxY, x2 - ctxX, y2 - ctxY, x3 - ctxX, y3 - ctxY);
+                    svgPath.push([`C`, [[x1, y1], [x2, y2], [x3, y3]]]);
+                };
+
                 ctx.beginPath();
                 if (isStart) {
-                    ctx.moveTo(x0 - d0, y0 - d0);
-                    ctx.lineTo(x1 - d1, y1 - d1);
+                    moveTo(x0 - d0, y0 - d0);
+                    lineTo(x1 - d1, y1 - d1);
+                    lineTo(x1 + d1, y1 + d1);
+                    lineTo(x0 - d0, y0 - d0);
+                    lineTo(x1 - d1, y1 - d1);
                 } else {
-                    ctx.moveTo(x1 - d1, y1 - d1);
+                    moveTo(x1 - d1, y1 - d1);
                 }
 
-                ctx.bezierCurveTo(x1 + vx - di, y1 + vy - di, x2 - d2, y2 - d2, x3 - d3, y3 - d3);
+                curveTo(x1 + vx - di, y1 + vy, x2 - d2, y2 - d2, x3 - d3, y3 - d3);
 
-                ctx.lineTo(x3 + d3, y3 + d3);
-                ctx.bezierCurveTo(x2 + d2, y2 + d2, x1 + vx + di, y1 + vy + di, x0 + d0, y0 + d0);
-                ctx.lineTo(x0 - d0, y0 - d0);
+                lineTo(x3 + d3, y3 + d3);
+                curveTo(x2 + d2, y2 + d2, x1 + vx + di, y1 + vy + di, x1 + d1, y1 + d1);
+                lineTo(x1 - d1, y1 - d1);
 
                 ctx.fill();
+                ctx.stroke();
             };
 
-            let lastCtx = null;
+            let ctx = previewCtx;
+            ctx.save();
+            ctx.fillStyle = lineColor;
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 1;//lineWidth;
 
-            for (let point of lastBuffer) {
-                let ctx = getCtx(point);
-                let ctxY = Math.floor(point.y / CANVAS_MAX_HEIGHT) * CANVAS_MAX_HEIGHT;
-
-                if (ctx != lastCtx) {
-                    ctx.save();
-                    ctx.fillStyle = lineColor;
-                    ctx.strokeStyle = lineColor;
-                    ctx.lineWidth = lineWidth;
-
-                    draw(ctx, ctxY);
-                    ctx.restore();
-                }
-
-                lastCtx = ctx;
-            }
+            console.log(point.clientY - point.y);
+            draw(ctx, point.x - point.clientX, point.y - point.clientY);
+            ctx.restore();
 
             lastBuffer = [lastBuffer[lastBuffer.length - 2], point];
             isStart = false;
         };
 
-        // Add all necessary canvases.
-        for (let i = 0; i < element.clientHeight; i += CANVAS_MAX_HEIGHT) {
-            addCanvas();
-        }
+        const endLine = (evt) => {
+            if (!pointersDown[evt.pointerId]) {
+                return;
+            }
+
+            let point = getPoint(evt);
+
+            continueLine(point);
+            previewCanvas.style.display = "none";
+
+            inputArea.releasePointerCapture(evt.pointerId);
+            pointersDown[evt.pointerId] = false;
+
+            if (svgPath.length === 0) {
+                let w = point.pressure * lineWidth;
+                let x = point.x;
+                let y = point.y;
+                svgPath.push([`M`, [[x - w, y - w]]]);
+                svgPath.push([`C`, [[x + w, y + w], [x, y + w], [x - w, y - w]]]);
+                svgPath.push([`L`, [[x, y]]]);
+            }
+
+            let strokeElem = document.createElement("div");
+            let minX, maxX, minY, maxY;
+
+            // Find the minimum, maximum
+            for (const [ operation, points ] of svgPath) {
+                for (const point of points) {
+                    let x = point[0];
+                    let y = point[1];
+
+                    if (minX === undefined) {
+                        minX = x;
+                        minY = y;
+                        maxX = x;
+                        maxY = y;
+                    }
+
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                }
+            }
+
+            const width = maxX - minX + SVG_PADDING * 2.0;
+            const height = maxY - minY + SVG_PADDING * 2.0;
+
+            if (!width || !height) {
+                return;
+            }
+
+            // Translate all points
+            const svgPathD = [];
+
+            for (const [ operation, points ] of svgPath) {
+                for (const point of points) {
+                    point[0] = Math.floor(point[0] - minX + SVG_PADDING);
+                    point[1] = Math.floor(point[1] - minY + SVG_PADDING);
+                }
+            }
+
+            for (const [operation, points] of svgPath) {
+                let pointsTxt = [];
+                for (const point of points) {
+                    pointsTxt.push(point.join(' '));
+                }
+                svgPathD.push(operation + ' ' + pointsTxt.join(', '));
+            }
+
+            strokeElem.style = `
+                position: absolute;
+                top: ${minY - SVG_PADDING}px;
+                left: ${minX - SVG_PADDING}px;
+                pointer-events: none;
+                z-index: ${Z_IDX_MAGNITUDE - 4};
+            `;
+
+            strokeElem.innerHTML = `
+            <svg width=${Math.floor(width)} height=${Math.floor(height)}>
+            <path d="${svgPathD.join(' ')} Z" stroke="${lineColor}" fill="${lineColor}" />
+            </svg>
+            `;
+
+            element.appendChild(strokeElem);
+        };
 
         inputArea.addEventListener("pointerdown", (evt) => {
             inputArea.setPointerCapture(evt.pointerId);
@@ -214,22 +299,13 @@
 
         inputArea.addEventListener("pointerup", (evt) => {
             evt.preventDefault();
-            inputArea.releasePointerCapture(evt.pointerId);
-
-            pointersDown[evt.pointerId] = false;
-            continueLine(getPoint(evt));
-
-            let point = getPoint(evt);
-            let ctx = getCtx(point);
-            let ctxY = Math.floor(point.y / CANVAS_MAX_HEIGHT) * CANVAS_MAX_HEIGHT;
-
-            ctx.beginPath();
-            ctx.fillStyle = lineColor;
-            ctx.arc(point.x, point.y - ctxY, lineWidth / 2.0 * point.pressure, 0, Math.PI * 2, true);
-            ctx.fill();
+            endLine(evt);
         });
 
         inputArea.addEventListener("pointerleave", (evt) => {
+            previewCanvas.style.display = "none";
+
+            inputArea.releasePointerCapture(evt.pointerId);
             pointersDown[evt.pointerId] = false;
         });
 
@@ -243,25 +319,25 @@
             }
         });
 
-        // Add a button to expand the drawing area.
-        let expandBtn = document.createElement("button");
-        expandBtn.innerHTML = "+";
-        expandBtn.classList.add(`${CSS_PREFIX}growBtn`);
-
-        expandBtn.onclick = () => {
-            addCanvas();
-        };
-
-        mainContainer.appendChild(inputArea);
-        mainContainer.appendChild(expandBtn);
+        //mainContainer.appendChild(inputArea);
+        mainContainer.appendChild(previewCanvas);
         element.appendChild(mainContainer);
-        element.appendChild(canvasContainer);
+
+        let height = element.clientHeight;
+        let main   = document.querySelector("main");
+
+        if (main) {
+            height = Math.max(main.clientHeight, height);
+        }
+
+        //inputArea.style.height = `${height}px`;
     };
 
-    annotateElement(document.body);
+    annotateElement(document.scrollingElement || document.documentElement);
 
     // Inject CSS
     let cssElem = document.createElement("style");
     cssElem.appendChild(document.createTextNode(CSS));
     document.documentElement.appendChild(cssElem);
 })();
+}catch(e) { console.error(e); }

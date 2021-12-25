@@ -9,9 +9,13 @@
 
 window.browser = window.browser || window.chrome;
 
-async function sendMessage(message) {
+async function getTabId() {
     let tabs = await browser.tabs.query({active: true, currentWindow: true});
-    browser.tabs.sendMessage(tabs[0].id, message);
+    return tabs[0].id;
+}
+
+async function sendMessage(message) {
+    browser.tabs.sendMessage(await getTabId(), message);
 }
 
 async function sendThickness(thickness) {
@@ -32,7 +36,10 @@ async function sendColor(color) {
 
 async function main() {
     try {
-        await browser.tabs.executeScript({ file: "/content/annotate.js" });
+        await chrome.scripting.executeScript({
+            target: {tabId: await getTabId()},
+            files: ["/content/annotate.js"]
+        });
         //await browser.tabs.addCSS({ file: "/content/annotate.css" });
     }
     catch(e) {
