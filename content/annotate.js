@@ -1,7 +1,5 @@
 "use strict";
 
-try{
-
 // Begin namespace
 (async () => {
     // Canvas height: 1024 px at maximum.
@@ -103,7 +101,7 @@ try{
                 clientX: evt.clientX, clientY: evt.clientY,
                 t: (new Date()).getTime(),
 
-                pressure: (evt.pressure || 0.6) + 0.3,
+                pressure: Math.min(Math.max(0.1, (evt.pressure || 0.6) + 0.1), 2.0),
             };
         };
 
@@ -144,15 +142,16 @@ try{
                     y2 = p2.y,
                     y3 = p3.y;
 
-                let vx = (x1 - x0) / (p1.t - p0.t);
-                let vy = (y1 - y0) / (p1.t - p0.t);
+                let dt = Math.max(p1.t - p0.t, 0.1);
+                let vx = (x1 - x0) / dt;
+                let vy = (y1 - y0) / dt;
 
-                vx *= 0.5 * (p2.t - p1.t);
-                vy *= 0.5 * (p2.t - p1.t);
+                vx *= 0.5 * dt;
+                vy *= 0.5 * dt;
 
                 const moveTo = (x, y) => {
                     ctx.moveTo(x - ctxX, y - ctxY);
-                    svgPath.push(['M', [[x, y]]]);
+                    svgPath.push([`M`, [[x, y]]]);
                 };
 
                 const lineTo = (x, y) => {
@@ -202,7 +201,6 @@ try{
         };
 
         const endLine = (evt) => {
-            try{
             if (!pointersDown[evt.pointerId]) {
                 return;
             }
@@ -237,6 +235,12 @@ try{
                     for (const point of points) {
                         let x = point[0];
                         let y = point[1];
+
+                        if (Math.abs(x) > 9999 || Math.abs(y) > 9999) {
+                            console.warn(operation, x, y);
+                            console.warn("Points: ", points);
+                            return;
+                        }
 
                         if (minX === undefined) {
                             minX = x;
@@ -299,7 +303,6 @@ try{
             `;
 
             element.appendChild(strokeElem);
-            }catch(e){console.error(e);}
         };
 
         const shouldIgnoreEvent = (evt) => {
@@ -403,4 +406,3 @@ try{
     cssElem.appendChild(document.createTextNode(CSS));
     document.documentElement.appendChild(cssElem);
 })();
-}catch(e) { console.error(e); }
