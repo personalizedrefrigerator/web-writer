@@ -46,6 +46,12 @@
             margin-right: auto;
             max-width: 300px;
         }
+
+        @media print {
+            .${CSS_PREFIX}controlsArea {
+                display: none;
+            }
+        }
     `;
 
 
@@ -113,7 +119,6 @@
         controls.appendChild(toggleMouseBtn);
 
         chrome.runtime.onMessage.addListener((message) => {
-            console.log("Got message", message);
             if (message.command === "setToolThickness") {
                 toolThicknessSlider.value = message.value;
             } else if (message.command === "setToolColor") {

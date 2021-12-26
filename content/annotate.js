@@ -6,7 +6,27 @@
     const CANVAS_MAX_HEIGHT = 256;
     const CSS_PREFIX = `_ANNOTATOR__`;
     const Z_IDX_MAGNITUDE = 4096;
-    const SVG_PADDING = 10;
+    const SVG_PADDING = 35;
+    const CONTAINER_ELEMS = {
+        "div": true,
+        "span": true,
+        "h1": true,
+        "h2": true,
+        "h3": true,
+        "h4": true,
+        "h5": true,
+        "h6": true,
+        "b": true,
+        "strong": true,
+        "i": true,
+        "emph": true,
+        "article": true,
+        "blockquote": true,
+        "main": true,
+        "header": true,
+        "footer": true,
+        "body": true
+    };
     const CSS = `
         .${CSS_PREFIX}growBtn {
             color: white;
@@ -51,8 +71,20 @@
             z-index: ${Z_IDX_MAGNITUDE};
         }
 
-        .${CSS_PREFIX}noTouchScroll, .${CSS_PREFIX}noTouchScroll > * {
+        .${CSS_PREFIX}noTouchScroll, .${CSS_PREFIX}noTouchScroll * {
             touch-action: pinch-zoom !important;
+        }
+
+        :not(.${CSS_PREFIX}noTouchScroll) .${CSS_PREFIX}strokeElem {
+            pointer-events: none;
+        }
+
+        .${CSS_PREFIX}strokeElem {
+            overflow: visible;
+            width: 0;
+            height: 0;
+            position: relative;
+            z-index: ${Z_IDX_MAGNITUDE - 4};
         }
     `;
 
@@ -81,6 +113,7 @@
         let inputArea = element;//document.createElement("div");
         let previewCanvas = document.createElement("canvas");
         let previewCtx = previewCanvas.getContext('2d');
+        let startElem = null;
         let acceptingInput = true;
         let pointersDown = {};
         let lastBuffer = [];
@@ -99,6 +132,7 @@
             return {
                 x: x, y: y,
                 clientX: evt.clientX, clientY: evt.clientY,
+                pageX: evt.pageX, pageY: evt.pageY,
                 t: (new Date()).getTime(),
 
                 pressure: Math.min(Math.max(0.1, (evt.pressure || 0.6) + 0.1), 2.0),
@@ -106,7 +140,7 @@
         };
 
         let isStart = false;
-        const startLine = (point) => {
+        const startLine = (point, evt) => {
             previewCanvas.style.display = "block";
             resizeCanvas(previewCanvas);
             previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
@@ -114,6 +148,7 @@
             lastBuffer = [];
             isStart = true;
             svgPaths = [];
+            startElem = evt.target;
         };
 
         const continueLine = (point) => {
@@ -272,8 +307,8 @@
                 // Translate all points
                 for (const [ operation, points ] of svgPath) {
                     for (const point of points) {
-                        point[0] = Math.floor((point[0] - minX + SVG_PADDING + 0.5) * 10.0) / 10.0;
-                        point[1] = Math.floor((point[1] - minY + SVG_PADDING + 0.5) * 10.0) / 10.0;
+                        point[0] = Math.floor((point[0] - minX + SVG_PADDING) * 10.0 + 0.5) / 10.0;
+                        point[1] = Math.floor((point[1] - minY + SVG_PADDING) * 10.0 + 0.5) / 10.0;
                     }
                 }
 
@@ -288,21 +323,41 @@
                 svgPathText.push(`<path d="${svgPathD.join(' ')} Z" stroke="${lineColor}" fill="${lineColor}"/>`);
             }
 
-            strokeElem.style = `
-                position: absolute;
-                top: ${minY - SVG_PADDING}px;
-                left: ${minX - SVG_PADDING}px;
-                pointer-events: none;
-                z-index: ${Z_IDX_MAGNITUDE - 4};
-            `;
+            const getSvgOffset = () => {
+                let bbox = strokeElem.getBoundingClientRect();
+                let startElemPos = { x: bbox.left + window.scrollX, y: bbox.top + window.scrollY };
 
+                return [ minX - SVG_PADDING - startElemPos.x, minY - SVG_PADDING - startElemPos.y ];
+            };
+
+            strokeElem.classList.add(`${CSS_PREFIX}strokeElem`);
             strokeElem.innerHTML = `
             <svg width=${Math.floor(width)} height=${Math.floor(height)}>
             ${svgPathText.join("")}
             </svg>
             `;
 
-            element.appendChild(strokeElem);
+            if (CONTAINER_ELEMS[startElem.tagName.toLowerCase()]) {
+                startElem.appendChild(strokeElem);
+            }
+            else if (startElem.parentElement) {
+                startElem.parentElement.insertBefore(strokeElem, startElem);
+            }
+            else {
+                elem.appendChild(strokeElem);
+            }
+
+            requestAnimationFrame(() => {
+                let bbox = strokeElem.getBoundingClientRect();
+                let pos = { x: bbox.left + window.scrollX, y: bbox.top + window.scrollY };
+                let wantedPos = { x: minX - SVG_PADDING, y: minY - SVG_PADDING };
+                let top = wantedPos.y - pos.y;
+                let left = wantedPos.x - pos.x;
+
+                // TODO: Don't requestAnimationFrame
+                strokeElem.style.top = top + "px";
+                strokeElem.style.left = left + "px";
+            });
         };
 
         const shouldIgnoreEvent = (evt) => {
@@ -336,7 +391,7 @@
             inputArea.setPointerCapture(evt.pointerId);
 
             evt.preventDefault();
-            startLine(getPoint(evt));
+            startLine(getPoint(evt), evt);
 
             pointersDown[evt.pointerId] = true;
         });
