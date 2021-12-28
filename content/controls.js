@@ -23,6 +23,7 @@
             background-color: black;
             color: white;
             font: 12pt sans;
+            overflow-y: auto;
 
             border-top-left-radius: 5px;
             border-top-right-radius: 5px;
@@ -45,6 +46,15 @@
             margin-left: auto;
             margin-right: auto;
             max-width: 300px;
+        }
+
+        .${CSS_PREFIX}controlsArea button {
+            border: 1px solid white;
+            background-color: black;
+            color: white;
+            padding: 4px;
+            border-radius: 4px;
+            box-shadow: 0px 0px 12px red;
         }
 
         @media print {

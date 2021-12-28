@@ -16,7 +16,10 @@
         "h4": true,
         "h5": true,
         "h6": true,
+        "th": true,
+        "td": true,
         "b": true,
+        "a": true,
         "strong": true,
         "i": true,
         "emph": true,
@@ -67,6 +70,7 @@
             bottom: 0;
             width: 100%;
             height: 100%;
+            pointer-events: none;
 
             z-index: ${Z_IDX_MAGNITUDE};
         }
@@ -83,8 +87,16 @@
             overflow: visible;
             width: 0;
             height: 0;
+            padding: 0;
+            margin: 0;
             position: relative;
             z-index: ${Z_IDX_MAGNITUDE - 4};
+        }
+
+        .${CSS_PREFIX}strokeElem > svg {
+            position: absolute;
+            top: 0;
+            left: 0;
         }
     `;
 
@@ -110,7 +122,7 @@
      */
     const annotateElement = function(element) {
         let mainContainer = document.createElement("div");
-        let inputArea = element;//document.createElement("div");
+        let inputArea = element;
         let previewCanvas = document.createElement("canvas");
         let previewCtx = previewCanvas.getContext('2d');
         let startElem = null;
@@ -225,7 +237,7 @@
             ctx.save();
             ctx.fillStyle = lineColor;
             ctx.strokeStyle = lineColor;
-            ctx.lineWidth = 1;//lineWidth;
+            ctx.lineWidth = 1;
 
             console.log(point.clientY - point.y);
             draw(ctx, point.x - point.clientX, point.y - point.clientY);
@@ -243,7 +255,6 @@
             let point = getPoint(evt);
 
             continueLine(point);
-            previewCanvas.style.display = "none";
 
             inputArea.releasePointerCapture(evt.pointerId);
             pointersDown[evt.pointerId] = false;
@@ -270,12 +281,6 @@
                     for (const point of points) {
                         let x = point[0];
                         let y = point[1];
-
-                        if (Math.abs(x) > 9999 || Math.abs(y) > 9999) {
-                            console.warn(operation, x, y);
-                            console.warn("Points: ", points);
-                            return;
-                        }
 
                         if (minX === undefined) {
                             minX = x;
@@ -331,32 +336,48 @@
             };
 
             strokeElem.classList.add(`${CSS_PREFIX}strokeElem`);
+            strokeElem.style.opacity = 0;
             strokeElem.innerHTML = `
             <svg width=${Math.floor(width)} height=${Math.floor(height)}>
             ${svgPathText.join("")}
             </svg>
             `;
 
-            if (CONTAINER_ELEMS[startElem.tagName.toLowerCase()]) {
-                startElem.appendChild(strokeElem);
-            }
-            else if (startElem.parentElement) {
-                startElem.parentElement.insertBefore(strokeElem, startElem);
-            }
-            else {
-                elem.appendChild(strokeElem);
+            let potentialParent = startElem;
+            let relativeChild = startElem;
+
+            while (potentialParent && !CONTAINER_ELEMS[potentialParent.tagName.toLowerCase()]) {
+                relativeChild = potentialParent;
+                potentialParent = potentialParent.parentElement;
             }
 
-            requestAnimationFrame(() => {
+            if (potentialParent && CONTAINER_ELEMS[potentialParent.tagName.toLowerCase()]) {
+                if (relativeChild !== potentialParent) {
+                    potentialParent.insertBefore(strokeElem, relativeChild);
+                }
+                else {
+                    potentialParent.appendChild(strokeElem);
+                }
+            }
+            else {
+                element.appendChild(strokeElem);
+            }
+
+            // After layout,
+            setTimeout(() => {
+                // Find out how much we need to move the stroke
                 let bbox = strokeElem.getBoundingClientRect();
                 let pos = { x: bbox.left + window.scrollX, y: bbox.top + window.scrollY };
                 let wantedPos = { x: minX - SVG_PADDING, y: minY - SVG_PADDING };
                 let top = wantedPos.y - pos.y;
                 let left = wantedPos.x - pos.x;
 
-                // TODO: Don't requestAnimationFrame
                 strokeElem.style.top = top + "px";
                 strokeElem.style.left = left + "px";
+
+                // Show the new stroke, hide the preview
+                strokeElem.style.opacity = 1;
+                previewCanvas.style.display = "none";
             });
         };
 
@@ -378,8 +399,10 @@
         const setTouchScrolls = (scrolls) => {
             if (!scrolls) {
                 inputArea.classList.add(`${CSS_PREFIX}noTouchScroll`);
+                document.documentElement.classList.add(`${CSS_PREFIX}noTouchScroll`);
             } else {
                 inputArea.classList.remove(`${CSS_PREFIX}noTouchScroll`);
+                document.documentElement.classList.remove(`${CSS_PREFIX}noTouchScroll`);
             }
         };
 
