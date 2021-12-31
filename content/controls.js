@@ -148,6 +148,274 @@
     }
 
     /**
+     * Convert an integer to a hex string.
+     * @param number Integer
+     * @param padToLength Integer, optional
+     */
+    function toHex(number, padToLength) {
+        let result = [];
+
+        const conversionTable = {
+            10: 'a',
+            11: 'b',
+            12: 'c',
+            13: 'd',
+            14: 'e',
+            15: 'f',
+        };
+
+        for (; number > 0; number = Math.floor(number / 16)) {
+            let digit = number % 16;
+
+            if (digit >= 0 && digit <= 9) {
+                result.push(`${digit}`);
+            } else {
+                result.push(`${conversionTable[digit]}`);
+            }
+        }
+
+        if (padToLength !== undefined) {
+            while (result.length < padToLength) {
+                result.push(`0`);
+            }
+        }
+
+        result.reverse();
+
+        return result.join('');
+    }
+
+    /** Convert from an (unprefixed) hex string to an integer. */
+    function fromHex(text) {
+        return parseInt(`0x${text}`);
+    }
+
+    assert(toHex(5) == 5, `toHex(5) failed`);
+    assert(toHex(15) == 'f', `toHex(0xf) failed`);
+    assert(toHex(0xfeedab3) == 'feedab3', `toHex(0xfeedab3) failed`);
+
+    /**
+     * Convert a hex or rgb/rgba color to an (r, g, b, a) quadruple.
+     * Each component ranges from 0 to 255.
+     */
+    function colorToQuadruple(color) {
+        // If already a quadruple
+        if (typeof (color) == "object") {
+            return [ color[0], color[1], color[2], color[3] !== undefined ? color[3] : 255 ];
+        }
+
+        const nameToQuadrupleTable = {
+            red: [ 255, 0, 0, 255 ],
+            green: [ 0, 255, 0, 255 ],
+            blue: [ 0, 0, 255, 255 ],
+            white: [ 255, 255, 255, 255 ],
+            black: [ 0, 0, 0, 255 ],
+            gray: [ 100, 100, 100, 255 ],
+            yellow: [ 255, 255, 0, 255 ],
+            purple: [ 255, 0, 255, 255 ],
+            orange: [ 255, 200, 50, 255 ],
+        };
+
+        if (nameToQuadrupleTable[color]) {
+            return nameToQuadrupleTable[color];
+        }
+
+        if (color.length == 0) {
+            return nameToQuadrupleTable.black;
+        }
+
+        // Color in the form #ff0000
+        if (color.charAt(0) == '#') {
+            let r, g, b, a = 255;
+
+            // #rgb
+            if (color.length === 4) {
+                r = fromHex(color.charAt(1)) * 16;
+                g = fromHex(color.charAt(2)) * 16;
+                b = fromHex(color.charAt(3)) * 16;
+            } // #argb
+            else if (color.length === 5) {
+                r = fromHex(color.charAt(1)) * 16;
+                g = fromHex(color.charAt(2)) * 16;
+                b = fromHex(color.charAt(3)) * 16;
+                a = fromHex(color.charAt(4)) * 16;
+            } // #rrggbb
+            else if (color.length === 7) {
+                r = fromHex(color.substr(1, 2));
+                g = fromHex(color.substr(3, 2));
+                b = fromHex(color.substr(5, 2));
+            } // #aarrggbb
+            else if (color.length === 9) {
+                r = fromHex(color.substr(1, 2));
+                g = fromHex(color.substr(3, 2));
+                b = fromHex(color.substr(5, 2));
+                a = fromHex(color.substr(7));
+            }
+            else {
+                throw new Error("Invalid color");
+            }
+
+            return [ r, g, b, a ];
+        }
+        else if (color.startsWith('rgb')) {
+            let expectedComponents = 3;
+            let startIdx = 'rgb('.length;
+
+            if (color.startsWith('rgba(')) {
+                expectedComponents = 4;
+                startIdx = 'rgba('.length;
+            }
+
+            let parts = color.substring(startIdx, color.length - 1).split(',');
+            let result = [];
+            for (const part of parts) {
+                result.push(Math.floor(parseFloat(part)));
+            }
+            assert(result.length === expectedComponents, `Given color has wrong number of components.`);
+
+            if (result.length == 3) {
+                result.push(255);
+            }
+
+            return result;
+        }
+        else {
+            throw new Error("Invalid color");
+        }
+    }
+
+    assert(colorToQuadruple('red').join(',') == '255,0,0,255', 'Red -> quadruple failed');
+    assert(colorToQuadruple('#fed').join(',') == '240,224,208,255', 'Pinkish -> quadruple failed');
+    assert(colorToQuadruple('#fed0').join(',') == '240,224,208,0', 'Pinkish but clear -> quadruple failed');
+    assert(colorToQuadruple('#ffeedd').join(',') == '255,238,221,255', 'Pinkish (2) -> quadruple failed');
+    assert(colorToQuadruple('#ffffff00').join(',') == '255,255,255,0', 'Clear white -> quadruple failed');
+    assert(colorToQuadruple('rgb(255, 0, 10)').join(',') == '255,0,10,255', 'rgb( -> quadruple failed');
+    assert(colorToQuadruple('rgba(1, 2, 3, 4)').join(',') == '1,2,3,4', 'rgba( -> quadruple failed');
+
+    /**
+     * Convert an (r, g, b, a) tuple to an ARGB hex string.
+     * R, G, B, A should each range from 0 to 255 (inclusive).
+     *
+     * E.g. (255, 0, 0, 255) -> ff0000ff;
+     */
+    function quadrupleToHex(r, g, b, a) {
+        // If we were called with quadrupleToHex([ r, g, b, a ])...
+        if (typeof (r) == typeof ([ 1, 2, 3, 4 ])) {
+            let quad = r;
+            r = quad[0];
+            g = quad[1];
+            b = quad[2];
+            a = quad[3];
+        }
+
+        return `${toHex(r, 2)}${toHex(g, 2)}${toHex(b, 2)}${toHex(a, 2)}`;
+    }
+
+    /**
+     * Create a color chooser.
+     * @return {
+     *  addTo(HTMLElement): Add the color chooser to the given element.
+     * }
+     */
+    function makeColorChooser(initialColor, onChange) {
+        let onUpdate;
+        const fullContainer = document.createElement(`div`);
+        const colorDisplay = document.createElement('div');
+        try {
+            initialColor = colorToQuadruple(initialColor);
+        } catch(e) {
+            console.warn("Color parse error", e);
+            initialColor = [255, 0, 0, 255];
+        }
+
+        colorDisplay.style = `
+            padding: 5px;
+            border-raduis: 10px;
+            box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+        `;
+
+        const createSlider = (id, labelText, value) => {
+            let sliderContainer = document.createElement("div");
+            let slider = document.createElement("input");
+            let label = document.createElement("label");
+            slider.id = `${CSS_PREFIX}${id}`;
+            slider.type = "range";
+            slider.min = 0;
+            slider.max = 255;
+            slider.step = 1;
+
+            label.appendChild(document.createTextNode(labelText));
+            label[`for`] = slider.id;
+
+            slider.value = value;
+
+            slider.ondblclick = () => {
+                if (slider.type == "range") {
+                    slider.type = "number";
+                }
+                else {
+                    slider.type = "range";
+                }
+            };
+            slider.oninput = slider.onchange = () => onUpdate();
+
+            fullContainer.appendChild(sliderContainer);
+            sliderContainer.appendChild(label);
+            sliderContainer.appendChild(slider);
+
+            return {
+                getValue() {
+                    return Math.floor(parseFloat(slider.value));
+                },
+            };
+        };
+
+        const updateDisplay = (color) => {
+            let colorStr = '#' + quadrupleToHex(color);
+            let foregroundColor = [ 255 - color[0], 255 - color[1], 255 - color[2], 255 ];
+            let fgBgContrast = Math.abs((color[0] + color[1] + color[2]) / 255 / 3
+                                        - (foregroundColor[0] + foregroundColor[1] + foregroundColor[2]) / 255 / 3);
+
+            colorDisplay.replaceChildren(document.createTextNode(colorStr));
+
+            // Ensure we have enough contrast for the foreground to be legible.
+            if (fgBgContrast < 0.2) {
+                foregroundColor = [ 0, 0, 0, 255 ];
+            }
+
+            // Inverse of the color
+            colorDisplay.style.color = '#' + quadrupleToHex( foregroundColor );
+            colorDisplay.style.backgroundColor = colorStr;
+        };
+
+        const sliders = {
+            r: createSlider('redslider', 'Red', initialColor[0]),
+            g: createSlider('greenslider', 'Green', initialColor[1]),
+            b: createSlider('blueslider', 'Blue', initialColor[2]),
+            a: createSlider('opacityslider', 'Opacity', initialColor[3]),
+        };
+
+        const getColor = () => {
+            return [ sliders.r.getValue(), sliders.g.getValue(), sliders.b.getValue(), sliders.a.getValue() ];
+        };
+
+        onUpdate = () => {
+            let color = getColor();
+            updateDisplay(color);
+            onChange('#' + quadrupleToHex(color));
+        };
+
+        fullContainer.appendChild(colorDisplay);
+        updateDisplay(getColor());
+
+        return {
+            addTo(elem) {
+                elem.appendChild(fullContainer);
+            },
+        };
+    }
+
+    /**
     * Make [target] draggable
     *
     * @param target HTMLElement The target of drag/drop gestures
@@ -493,6 +761,8 @@
 
     let controlsContainer = document.createElement("div");
     let toolbox;
+    let toolColor;
+
     toolbox = new ToolboxBuilder()
         .addItem(new ToolItem("Eraser Tool", "eraser.svg", () => {
             sendMessage({
@@ -516,7 +786,19 @@
             });
         }))
         .addItem(new ToolItem("Set Color", "setColor.svg", () => {
-            toolbox.showDialog(document.createTextNode("Test"));
+            const container = document.createElement('div');
+            const colorChooser = makeColorChooser(toolColor, (color) => {
+                toolColor = color;
+
+                sendMessage({
+                    command: "setToolColor",
+                    value: toolColor,
+                    forward: true,
+                });
+            });
+
+            colorChooser.addTo(container);
+            toolbox.showDialog(container);
         }))
         .addItem(new ToolItem("Set Thickness", "setThickness.svg", () => {
 
@@ -603,15 +885,17 @@
         controls.appendChild(toolThicknessSlider);
         controls.appendChild(toggleMouseBtn);
 
-        chrome.runtime.onMessage.addListener((message) => {
-            if (message.command === "setToolThickness") {
-                toolThicknessSlider.value = message.value;
-            } else if (message.command === "setToolColor") {
-                toolColorSelect.value = message.value;
-            }
-        });
+
 
     };
+
+    chrome.runtime.onMessage.addListener((message) => {
+        if (message.command === "setToolThickness") {
+            ;
+        } else if (message.command === "setToolColor") {
+            toolColor = message.value;
+        }
+    });
 
     // Wrap the toolbox in an additional <div></div>: We can set CSS variables
     // on the enclosing div that affect controls and its children.
