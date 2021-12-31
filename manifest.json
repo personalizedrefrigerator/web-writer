@@ -18,6 +18,10 @@
     "background": {
         "scripts": ["background.js"]
     },
+    
+    "web_accessible_resources": [
+        "icons/toolbar/*.svg"
+    ],
 
     "permissions": ["storage", "activeTab", "<all_urls>"]
 }
