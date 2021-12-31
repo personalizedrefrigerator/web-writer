@@ -11,24 +11,57 @@
             --secondary-color-bg: #ffeeff;
             --primary-color-fg: #333;
             --secondary-color-fg: #222;
+
+            width: 0;
+            height: 0;
+            padding: 0;
+            margin: 0;
+            border: none;
+            background: none;
         }
 
         div.${CSS_PREFIX}toolbox {
-            display: grid;
-
-            /* 3 columns, each 1/3rd of the total width. */
-            grid-template-columns: min-content 1fr min-content;
-            gap: 0px;
-
             max-width: 50vw;
+
+            /* Some pages set the width of all divs. Override this. */
+            width: unset;
+            padding: 0;
+            margin: 0;
 
             border-radius: 5px;
             box-shadow: 0 0 3px var(--secondary-color-fg);
             z-index: ${CTRLS_Z_INDEX};
 
             background: var(--secondary-color-bg);
+            color: var(--secondary-color-fg);
 
             position: fixed;
+        }
+
+        div.${CSS_PREFIX}toolbox * {
+            width: unset;
+            height: unset;
+            margin: 0;
+            padding: 0;
+            box-shadow: none;
+        }
+
+        div.${CSS_PREFIX}toolbox > .${CSS_PREFIX}grid {
+            display: grid;
+
+            /* 3 columns, each 1/3rd of the total width. */
+            grid-template-columns: min-content 1fr min-content;
+            gap: 0px;
+
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        div.${CSS_PREFIX}toolbox > .${CSS_PREFIX}dialog {
+            max-width: 100%;
+            padding: 5px;
+
+            font: 12pt sans;
         }
 
         div.${CSS_PREFIX}toolbox .${CSS_PREFIX}toolbarBtn {
@@ -75,6 +108,18 @@
             letter-spacing: -1pt;
         }
 
+        div.${CSS_PREFIX}toolbox .${CSS_PREFIX}backBtn {
+            display: inline-block;
+            color: var(--primary-color-fg);
+            background: var(--primary-color-bg);
+            border: 1px solid var(--primary-color-fg);
+
+            border-radius: 2px;
+            padding: 3px;
+
+            flex-grow: 0;
+        }
+
         @media print {
             .${CSS_PREFIX}toolbox {
                 display: none;
@@ -83,7 +128,7 @@
 
         @media (prefers-color-scheme: dark) {
             div.${CSS_PREFIX}toolbox {
-                --primary-color-bg: black;
+                --primary-color-bg: #444;
                 --secondary-color-bg: #434;
                 --primary-color-fg: white;
                 --secondary-color-fg: white;
@@ -203,6 +248,8 @@
         this.justDragged_ = false;
 
         this.iconElem_.src = chrome.runtime.getURL(`icons/toolbar/${iconPath}`);
+        this.iconElem_.alt = "";
+
         this.descriptionElem_.appendChild(document.createTextNode(text));
 
         this.containerElem_.onclick = () => {
@@ -269,10 +316,14 @@
     * Constructs a draggable toolbox.
     */
     function ToolboxBuilder() {
-        this.container_ = document.createElement("div");
+        this.containerElem_ = document.createElement("div");
+        this.gridElem_ = document.createElement("div");
+        this.dialogElem_ = document.createElement("div");
 
         // Styles
-        this.container_.classList.add(`${CSS_PREFIX}toolbox`);
+        this.containerElem_.classList.add(`${CSS_PREFIX}toolbox`);
+        this.gridElem_.classList.add(`${CSS_PREFIX}grid`);
+        this.dialogElem_.classList.add(`${CSS_PREFIX}dialog`);
 
         this.grid_ = [
             [ null, null, null ],
@@ -288,6 +339,9 @@
         this.grid_[1][1] = this.dragger_;
         this.nextRowIdx_ = 0;
         this.nextColIdx_ = 0;
+
+        this.containerElem_.appendChild(this.gridElem_);
+        this.containerElem_.appendChild(this.dialogElem_);
     }
 
     /**
@@ -311,7 +365,40 @@
 
     ToolboxBuilder.prototype.build = function() {
         let currentPos = [50, 50];
-        let container = this.container_;
+        const container = this.containerElem_;
+        const gridContainer = this.gridElem_;
+        const dialogContainer = this.dialogElem_;
+        let toolbox;
+        let dialogBackArrowContainer;
+
+        let onDrag;
+
+        dialogContainer.style.display = "none";
+
+        /// Creates a button that cancels the dialog and returns to
+        /// the toolbox view.
+        const createDialogTitlebar = () => {
+            let container = document.createElement("div");
+            let backBtn = document.createElement('button');
+            let dragBar = document.createElement('div');
+
+            // TODO: Test this back button with screen readers
+            backBtn.appendChild(document.createTextNode(`←`));
+
+            backBtn.classList.add(`${CSS_PREFIX}backBtn`);
+            container.style.display = `flex`;
+            container.style.flexDirection = `row`;
+            dragBar.style.flexGrow = 1;
+            backBtn.style.flexGrow = 0;
+
+            backBtn.onclick = () => toolbox.showToolbox();
+
+            makeDraggable(dragBar, onDrag);
+
+            container.appendChild(backBtn);
+            container.appendChild(dragBar);
+            return container;
+        };
 
         /// Update the position of the toolbox based on the contents
         /// of [currentPos].
@@ -322,8 +409,8 @@
             x -= container.clientWidth / 2 / window.innerWidth * 100;
             y -= container.clientHeight / 2 / window.innerHeight * 100;
 
-            this.container_.style.left = `${Math.floor(x + 0.5)}vw`;
-            this.container_.style.top = `${Math.floor(y + 0.5)}vh`;
+            this.containerElem_.style.left = `${Math.floor(10 * x + 0.5) / 10}vw`;
+            this.containerElem_.style.top = `${Math.floor(10 * y + 0.5) / 10}vh`;
         };
 
         /// Move the toolbox by (dx, dy) in units of (vw, vh)
@@ -334,10 +421,12 @@
             updatePos();
         };
 
-        this.dragger_.setDraggable(true, (dx, dy) => {
+        onDrag = (dx, dy) => {
             // Convert to (vw, vh) units
             moveBy(dx / window.innerWidth * 100, dy / window.innerHeight * 100);
-        });
+        };
+
+        this.dragger_.setDraggable(true, onDrag);
 
         this.toggleExpanded_ = () => {
             for (let row of this.grid_) {
@@ -359,13 +448,41 @@
                     this.grid_[y][x] = item;
                 }
 
-                item.appendTo(container);
+                item.appendTo(gridContainer);
             }
         }
 
         requestAnimationFrame(() => updatePos());
 
-        return container;
+        dialogBackArrowContainer = createDialogTitlebar();
+
+        // Return the toolbox:
+        toolbox = {
+            container: container,
+            dialogContainer: dialogContainer,
+
+            /// Show [elem] as a dialog, (temporarily replace the toolbox grid)
+            showDialog: (elem) => {
+                dialogContainer.replaceChildren(dialogBackArrowContainer, elem);
+
+                // Make the dialog roughly the size of the grid
+                dialogContainer.style.width = `${gridContainer.clientWidth}px`;
+                dialogContainer.style.height = `${gridContainer.clientHeight}px`;
+
+                dialogContainer.style.display = "";
+                gridContainer.style.display = "none";
+            },
+
+            /// Hide the dialog and show the toolbox grid.
+            showToolbox: () => {
+                // Empty the dialog & hide it.
+                dialogContainer.replaceChildren();
+                dialogContainer.style.display = "none";
+                gridContainer.style.display = "";
+            },
+        };
+
+        return toolbox;
     };
 
     if (window.__ANNOTATOR_CTRL_SCRIPT_INJECTED) {
@@ -375,7 +492,8 @@
 
 
     let controlsContainer = document.createElement("div");
-    let controls = new ToolboxBuilder()
+    let toolbox;
+    toolbox = new ToolboxBuilder()
         .addItem(new ToolItem("Eraser Tool", "eraser.svg", () => {
             sendMessage({
                 command: "setDrawingMode",
@@ -398,7 +516,7 @@
             });
         }))
         .addItem(new ToolItem("Set Color", "setColor.svg", () => {
-
+            toolbox.showDialog(document.createTextNode("Test"));
         }))
         .addItem(new ToolItem("Set Thickness", "setThickness.svg", () => {
 
@@ -423,6 +541,7 @@
             });
         }))
         .build();
+    let controls = toolbox.container;
 
     const injectCSS = () => {
         let elem = document.createElement("style");
@@ -494,12 +613,11 @@
 
     };
 
+    // Wrap the toolbox in an additional <div></div>: We can set CSS variables
+    // on the enclosing div that affect controls and its children.
     controlsContainer.classList.add(`${CSS_PREFIX}controlsArea`);
     controls.classList.add(`${CSS_PREFIX}controls`);
     controls.classList.add(`__ANNOTATOR_CTRLS`);
-
-    //addToolOptions();
-
     controlsContainer.appendChild(controls);
     document.documentElement.appendChild(controlsContainer);
 

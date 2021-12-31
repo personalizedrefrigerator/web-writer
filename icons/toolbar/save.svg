@@ -11,6 +11,7 @@
    sodipodi:docname="save.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns="http://www.w3.org/2000/svg"
    xmlns:svg="http://www.w3.org/2000/svg">
   <sodipodi:namedview
@@ -37,7 +38,50 @@
        id="grid31" />
   </sodipodi:namedview>
   <defs
-     id="defs2" />
+     id="defs2">
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient1314">
+      <stop
+         style="stop-color:#4d4d4d;stop-opacity:1"
+         offset="0"
+         id="stop1310" />
+      <stop
+         style="stop-color:#999999;stop-opacity:1"
+         offset="1"
+         id="stop1312" />
+    </linearGradient>
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient833-3">
+      <stop
+         style="stop-color:#666666;stop-opacity:1"
+         offset="0"
+         id="stop829" />
+      <stop
+         style="stop-color:#999999;stop-opacity:1"
+         offset="1"
+         id="stop831" />
+    </linearGradient>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient833-3"
+       id="linearGradient835"
+       x1="20"
+       y1="105"
+       x2="100"
+       y2="55"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient1314"
+       id="linearGradient1209"
+       x1="20"
+       y1="30"
+       x2="40"
+       y2="15"
+       gradientUnits="userSpaceOnUse" />
+  </defs>
   <g
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
@@ -74,14 +118,14 @@
        cy="63.5"
        r="2.5" />
     <rect
-       style="fill:#b3b3b3;stroke-width:1.78885"
+       style="fill:url(#linearGradient835);stroke-width:1.78885;fill-opacity:1"
        id="rect12"
        width="80"
        height="64"
        x="20"
        y="46" />
     <rect
-       style="fill:#4d4d4d;stroke-width:0.5"
+       style="fill:url(#linearGradient1209);stroke-width:0.5;fill-opacity:1"
        id="rect25"
        width="20"
        height="20"

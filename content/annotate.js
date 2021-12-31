@@ -97,6 +97,9 @@
             position: absolute;
             top: 0;
             left: 0;
+            max-width: unset !important;
+            height: auto;
+            width: auto;
         }
     `;
 
