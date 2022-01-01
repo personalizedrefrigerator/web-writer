@@ -151,6 +151,7 @@
                 t: (new Date()).getTime(),
 
                 pressure: Math.min(Math.max(0.1, (evt.pressure || 0.5) + 0.1), 2.0),
+                angle: (evt.twist || 0) * Math.PI / 180,
             };
         };
 
@@ -186,6 +187,18 @@
                 let d3 = p3.pressure * lineWidth;
                 let di = (d1 + d2) / 2.0;
 
+                // Compute the sins and cosines of the pen angle at each point.
+                let c0 = Math.cos(p0.angle);
+                let s0 = Math.sin(p0.angle);
+                let c1 = Math.cos(p1.angle);
+                let s1 = Math.sin(p1.angle);
+                let c2 = Math.cos(p2.angle);
+                let s2 = Math.sin(p2.angle);
+                let c3 = Math.cos(p3.angle);
+                let s3 = Math.sin(p3.angle);
+                let ci = Math.cos((p1.angle + p2.angle) / 2.0);
+                let si = Math.sin((p1.angle + p2.angle) / 2.0);
+
                 let x0 = p0.x, x1 = p1.x, x2 = p2.x, x3 = p3.x;
                 let y0 = p0.y,
                     y1 = p1.y,
@@ -216,20 +229,20 @@
 
                 ctx.beginPath();
                 if (isStart) {
-                    moveTo(x0 - d0, y0 - d0);
-                    lineTo(x1 - d1, y1 - d1);
-                    lineTo(x1 + d1, y1 + d1);
-                    lineTo(x0 - d0, y0 - d0);
-                    lineTo(x1 - d1, y1 - d1);
+                    moveTo(x0 - d0 * c0, y0 - d0 * s0);
+                    lineTo(x1 - d1 * c1, y1 - d1 * s1);
+                    lineTo(x1 + d1 * c1, y1 + d1 * s1);
+                    lineTo(x0 - d0 * c0, y0 - d0 * s0);
+                    lineTo(x1 - d1 * c1, y1 - d1 * s1);
                 } else {
-                    moveTo(x1 - d1, y1 - d1);
+                    moveTo(x1 - d1 * c1, y1 - d1 * s1);
                 }
 
-                curveTo(x1 + vx - di, y1 + vy - di, x2 - d2, y2 - d2, x3 - d3, y3 - d3);
+                curveTo(x1 + vx - di * ci, y1 + vy - di * si, x2 - d2 * c2, y2 - d2 * s2, x3 - d3 * c3, y3 - d3 * s3);
 
-                lineTo(x3 + d3, y3 + d3);
-                curveTo(x2 + d2, y2 + d2, x1 + vx + di, y1 + vy + di, x1 + d1, y1 + d1);
-                lineTo(x1 - d1, y1 - d1);
+                lineTo(x3 + d3 * c3, y3 + d3 * s3);
+                curveTo(x2 + d2 * c2, y2 + d2 * s2, x1 + vx + di * ci, y1 + vy + di * si, x1 + d1 * c1, y1 + d1 * s1);
+                lineTo(x1 - d1 * c1, y1 - d1 * s1);
 
                 ctx.fill();
                 ctx.stroke();
@@ -268,8 +281,7 @@
                 let x = point.x;
                 let y = point.y;
                 svgPath.push([`M`, [[x - w, y - w]]]);
-                svgPath.push([`C`, [[x + w, y + w], [x, y + w], [x - w, y - w]]]);
-                svgPath.push([`L`, [[x, y]]]);
+                svgPath.push([`C`, [[x + w * 2.0, y + w * 2.0], [x + w, y - w * 2.0], [x - w, y - w * 2.0]]]);
 
                 svgPaths.push(svgPath);
             }
