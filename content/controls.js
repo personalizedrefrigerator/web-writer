@@ -60,8 +60,14 @@
         div.${CSS_PREFIX}toolbox > .${CSS_PREFIX}dialog {
             max-width: 100%;
             padding: 5px;
+            display: flex;
+            flex-direction: column;
 
             font: 12pt sans;
+        }
+
+        div.${CSS_PREFIX}toolbox > .${CSS_PREFIX}dialog input {
+            display: inline-block;
         }
 
         div.${CSS_PREFIX}toolbox .${CSS_PREFIX}toolbarBtn {
@@ -428,8 +434,12 @@
      * }
      */
     function makeDraggable(target, onDrag, onDragStart, onDragEnd) {
+        // Minimum number of pixels the pointer has to move to start a drag.
+        const DRAG_START_THRESHOLD = 5;
+
         let endingDrag = false;
         let dragging = false;
+        let preDrag = false;
         let lastPos = [];
         let startPos = [];
 
@@ -439,23 +449,34 @@
         const getPos = (evt) => [ evt.screenX, evt.screenY ];
         const getDelta = (evt) => [ evt.screenX - lastPos[0], evt.screenY - lastPos[1] ];
 
+        target.style.touchAction = 'pinch-zoom';
+
         const handlePtrDown = (evt) => {
             target.setPointerCapture(evt.pointerId);
-            dragging = true;
+            dragging = false;
             lastPos = getPos(evt);
             evt.preventDefault();
-            startPos = [lastPos[0], lastPos[1]];
 
-            onDragStart(lastPos[0], lastPos[1]);
+            startPos = [lastPos[0], lastPos[1]];
+            preDrag = true;
         };
 
         const handlePtrMove = (evt) => {
+            let pos = getPos(evt);
+
+            // If we've moved far enough to start dragging,
+            if (preDrag && Math.hypot(pos[0] - startPos[0], pos[1] - startPos[1]) >= DRAG_START_THRESHOLD) {
+                preDrag = false;
+                dragging = true;
+                onDragStart(startPos[0], startPos[1]);
+            }
+
             if (dragging) {
                 evt.preventDefault();
                 let del = getDelta(evt);
                 onDrag(del[0], del[1]);
 
-                lastPos = getPos(evt);
+                lastPos = pos;
             }
         };
 
@@ -468,9 +489,13 @@
             if (endingDrag) {
                 cleanupPtrEndEvents();
             }
-            dragging = false;
 
-            onDragEnd(evt.screenX - startPos[0], evt.screenY - startPos[1]);
+            if (dragging) {
+                requestAnimationFrame(() => onDragEnd(evt.screenX - startPos[0], evt.screenY - startPos[1]));
+            }
+
+            dragging = false;
+            preDrag = false;
         };
 
 
@@ -551,7 +576,9 @@
             this.endDrag_ = makeDraggable(this.containerElem_, (dx, dy) => {
                 onDrag(dx, dy);
                 this.justDragged_ = true;
-            }, () => {
+            }, () => { // dragStart
+                this.justDragged_ = true;
+            }, () => { // dragStop
                 this.justDragged_ = false;
             });
         }
@@ -668,6 +695,15 @@
             return container;
         };
 
+        const makeDraggablePadding = () => {
+            let padding = document.createElement('div');
+            padding.style.flexGrow = 10;
+            padding.style.flexShrink = 10;
+            makeDraggable(padding, onDrag);
+
+            return padding;
+        };
+
         /// Update the position of the toolbox based on the contents
         /// of [currentPos].
         const updatePos = () => {
@@ -731,7 +767,7 @@
 
             /// Show [elem] as a dialog, (temporarily replace the toolbox grid)
             showDialog: (elem) => {
-                dialogContainer.replaceChildren(dialogBackArrowContainer, elem);
+                dialogContainer.replaceChildren(dialogBackArrowContainer, elem, makeDraggablePadding());
 
                 // Make the dialog roughly the size of the grid
                 dialogContainer.style.width = `${gridContainer.clientWidth}px`;
