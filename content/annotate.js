@@ -150,7 +150,7 @@
                 pageX: evt.pageX, pageY: evt.pageY,
                 t: (new Date()).getTime(),
 
-                pressure: Math.min(Math.max(0.1, (evt.pressure || 0.6) + 0.1), 2.0),
+                pressure: Math.min(Math.max(0.1, (evt.pressure || 0.5) + 0.1), 2.0),
             };
         };
 
@@ -242,7 +242,6 @@
             ctx.strokeStyle = lineColor;
             ctx.lineWidth = 1;
 
-            console.log(point.clientY - point.y);
             draw(ctx, point.x - point.clientX, point.y - point.clientY);
             ctx.restore();
 
@@ -470,7 +469,7 @@
             } else if (message.command === "setToolColor") {
                 lineColor = message.value;
             } else if (message.command === "setDrawingMode") {
-                acceptingInput = message.value;
+                acceptingInput = message.value != 'mouse';
                 setTouchScrolls(!acceptingInput);
             }
         });

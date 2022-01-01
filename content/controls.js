@@ -416,17 +416,17 @@
     }
 
     /**
-    * Make [target] draggable
-    *
-    * @param target HTMLElement The target of drag/drop gestures
-    * @param onDrag void(dx, dy) Called when the given target is dragged by (dx, dy) pixels.
-    * @param onDragStart void(startX, startY)
-    * @param onDragEnd void(fullDx, fullDy) Called when the user stops dragging the element, with the full change
-    *                                       in (x, y) position over the entire drag.
-    * @return {
-    *  endDrag: void(void) Clean up, stop dragging the target
-    * }
-    */
+     * Make [target] draggable
+     *
+     * @param target HTMLElement The target of drag/drop gestures
+     * @param onDrag void(dx, dy) Called when the given target is dragged by (dx, dy) pixels.
+     * @param onDragStart void(startX, startY)
+     * @param onDragEnd void(fullDx, fullDy) Called when the user stops dragging the element, with the full change
+     *                                       in (x, y) position over the entire drag.
+     * @return {
+     *  endDrag: void(void) Clean up, stop dragging the target
+     * }
+     */
     function makeDraggable(target, onDrag, onDragStart, onDragEnd) {
         let endingDrag = false;
         let dragging = false;
@@ -761,10 +761,11 @@
 
     let controlsContainer = document.createElement("div");
     let toolbox;
-    let toolColor;
+    let toolColor, toolThickness;
 
     toolbox = new ToolboxBuilder()
         .addItem(new ToolItem("Eraser Tool", "eraser.svg", () => {
+            alert('not implemented');
             sendMessage({
                 command: "setDrawingMode",
                 value: "eraser",
@@ -780,8 +781,8 @@
         }))
         .addItem(new ToolItem("Calligraphic Pen", "calligraphy.svg", () => {
             sendMessage({
-                command: "calligraphy",
-                value: "mouse",
+                command: "setDrawingMode",
+                value: "calligraphy",
                 forward: true,
             });
         }))
@@ -801,21 +802,99 @@
             toolbox.showDialog(container);
         }))
         .addItem(new ToolItem("Set Thickness", "setThickness.svg", () => {
+            toolThickness = toolThickness || 0.5;
 
+            const container = document.createElement('div');
+            const firstRow = document.createElement('div');
+            const secondRow = document.createElement('div');
+
+            const labelElem = document.createElement('label');
+            const thicknessSlider = document.createElement('input');
+            const previewCanvas = document.createElement('canvas');
+
+            thicknessSlider.id = `${CSS_PREFIX}thicknessSlider`;
+            labelElem[`for`] = thicknessSlider.id;
+            thicknessSlider.min = 0.1;
+            thicknessSlider.max = 30;
+            thicknessSlider.step = 0.1;
+            thicknessSlider.type = "range";
+            thicknessSlider.value = toolThickness;
+
+            previewCanvas.style.display = 'block';
+            previewCanvas.style.maxWidth = '300px';
+            previewCanvas.style.height = '80px';
+            previewCanvas.style.width = '100%';
+            previewCanvas.style.marginLeft = 'auto';
+            previewCanvas.style.marginRight = 'auto';
+            previewCanvas.style.backgroundColor = 'white';
+            previewCanvas.style.borderRadius = "5px";
+
+            labelElem.appendChild(document.createTextNode(`Thickness:`));
+
+            const updatePreview = () => {
+                const ctx = previewCanvas.getContext('2d');
+
+                // Resize the preview, if necessary
+                if (ctx.canvas.width != ctx.canvas.clientWidth || ctx.canvas.height != ctx.canvas.clientHeight) {
+                    ctx.canvas.width = ctx.canvas.clientWidth;
+                    ctx.canvas.height = ctx.canvas.clientHeight;
+                }
+
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+                ctx.beginPath();
+                ctx.moveTo(ctx.canvas.width / 8, ctx.canvas.height / 2);
+                ctx.bezierCurveTo(ctx.canvas.width / 3, ctx.canvas.height / 8,
+                                  ctx.canvas.width / 2, ctx.canvas.height * 7 / 8,
+                                  ctx.canvas.width * 7 / 8, ctx.canvas.height * 5 / 8);
+                ctx.lineTo(ctx.canvas.width * 7 / 8, ctx.canvas.height * 5 / 8);
+
+                ctx.lineCap = "round";
+                ctx.lineWidth = toolThickness;
+                ctx.stroke();
+            };
+
+            thicknessSlider.ondblclick = () => {
+                thicknessSlider.type = thicknessSlider.type === "range" ? "number" : "range";
+            };
+
+            thicknessSlider.onchange = thicknessSlider.oninput = () => {
+                toolThickness = parseFloat(thicknessSlider.value);
+                updatePreview();
+
+                sendMessage({
+                    command: "setToolThickness",
+                    value: toolThickness,
+                    forward: true,
+                });
+            };
+
+            firstRow.appendChild(labelElem);
+            firstRow.appendChild(thicknessSlider);
+            secondRow.appendChild(previewCanvas);
+
+            container.appendChild(firstRow);
+            container.appendChild(secondRow);
+            toolbox.showDialog(container);
+
+            updatePreview();
         }))
         .addItem(new ToolItem("Save", "save.svg", () => {
+            alert('not implemented');
             sendMessage({
                 command: "save",
                 forward: true,
             });
         }))
         .addItem(new ToolItem("Open", "open.svg", () => {
+            alert('not implemented');
             sendMessage({
                 command: "open",
                 forward: true,
             });
         }))
         .addItem(new ToolItem("Pencil", "pencil.svg", () => {
+            alert('not implemented');
             sendMessage({
                 command: "setDrawingMode",
                 value: "pencil",
@@ -835,63 +914,9 @@
         chrome.runtime.sendMessage(undefined, message);
     };
 
-    const addToolOptions = () => {
-        let toolColorSelect = document.createElement("input");
-        let toolThicknessSlider = document.createElement("input");
-        let toggleMouseBtn = document.createElement("button");
-        let usingMouse = false;
-
-        toolColorSelect.type = "color";
-        toolColorSelect.oninput = toolColorSelect.onchange = function() {
-            sendMessage({
-                command: "setToolColor",
-                value: this.value,
-                forward: true,
-            });
-        };
-
-        toolThicknessSlider.type = "range";
-        toolThicknessSlider.min = 0.4;
-        toolThicknessSlider.max = 50;
-        toolThicknessSlider.oninput = function() {
-            sendMessage({
-                command: "setToolThickness",
-                value: this.value,
-                forward: true,
-            });
-        };
-
-        toggleMouseBtn.onclick = () => {
-            usingMouse = !usingMouse;
-
-            if (usingMouse) {
-                toggleMouseBtn.innerHTML = "Mouse";
-            } else {
-                toggleMouseBtn.innerHTML = "Draw";
-            }
-
-            sendMessage({
-                command: "setDrawingMode",
-                value: usingMouse,
-                forward: true,
-            });
-        };
-
-        toolColorSelect.alt = "Tool Color";
-        toolThicknessSlider.alt = "Tool Thickness";
-        toggleMouseBtn.innerHTML = "Mouse";
-
-        controls.appendChild(toolColorSelect);
-        controls.appendChild(toolThicknessSlider);
-        controls.appendChild(toggleMouseBtn);
-
-
-
-    };
-
     chrome.runtime.onMessage.addListener((message) => {
         if (message.command === "setToolThickness") {
-            ;
+            toolThickness = parseFloat(message.value);
         } else if (message.command === "setToolColor") {
             toolColor = message.value;
         }
