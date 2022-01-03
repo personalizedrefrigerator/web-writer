@@ -109,6 +109,7 @@
         return;
     }
 
+
     /**
      * Ensure that the drawing context's internal width matches the
      * canvas' styled width and height.
@@ -119,6 +120,177 @@
             canvas.height = canvas.clientHeight;
         }
     };
+
+    /// Placeholder for abstract (not implemented) functions.
+    const NOT_IMPLEMENTED = () => { throw new Error(`Function not implemented`); };
+
+    /** Abstract base class for Actions */
+    function Action() { }
+
+    /**
+     * Undoes this action.
+     *
+     * @return Action The inverse of this action. As such, action.undo().undo() has no net effect.
+     */
+    Action.prototype.undo = NOT_IMPLEMENTED;
+
+    /**
+     * @return Action The inverse of this action, such that action.getInverse().undo() re-does the action.
+     */
+    Action.prototype.getInverse = NOT_IMPLEMENTED;
+
+    /** Represents the creation of a stroke. */
+    function StrokeAction(stroke) {
+        Action.call(this);
+    }
+
+    // Inherit from Action
+    StrokeAction.prototype = Object.create(Action.prototype);
+
+    /** Represents the deletion of a stroke. */
+    function EraseAction() {
+        Action.call(this);
+    }
+
+    // Inherit from Action
+    EraseAction.prototype = Object.create(Action.prototype);
+
+    function Stroke() {
+        this.points_ = [];
+        this.svgElem_ = null;
+        this.svgParent_ = null;
+    }
+
+    /**
+     * @param p1 Point2D Point 1 of the line segment.
+     * @param p2 Point2D Point 2 of the line segment.
+     * @return bool true iff a segment of this (approximately) intersects
+     *              the line segment from p1 to p2.
+     */
+    Stroke.prototype.intersects = function(p1, p2) {
+        // TODO: Sort line segments by approximate distance to p1?
+        for (let i = 0; i < this.points_.length - 1; i++) { // → bool
+            let p3 = this.points_[i];
+            let p4 = this.points_[i + 1];
+            let x, y;
+
+            // Denote Δx₁ = p2ₓ - p1ₓ, Δx₂ = p4ₓ - p3ₓ,
+            //        Δy₁ = p2ᵧ - p1ᵧ, Δy₂ = p4ᵧ - p3ᵧ
+            // If p2ᵧ ≠ p1ᵧ, p4ᵧ = p3ᵧ
+            // y = ( Δy₁ / Δx₁ ) · (x - p1ₓ) + p1ᵧ
+            // y = ( Δy₂ / Δx₂ ) · (x - p3ₓ) + p3ᵧ
+            //⇒ y · Δx₁ = ( ( Δy₁ / Δx₁ ) · (x - p1ₓ) + p1ᵧ ) · ( Δx₁ )   [ Algebra ]
+            //  and
+            //  y · Δx₂ = ( ( Δy₂ / Δx₂ ) · (x - p3ₓ) + p3ᵧ ) · ( Δx₂ )
+            //
+            // Therefore, to allow p2ᵧ = p1ᵧ and p4ᵧ = p3ᵧ,
+            //  y · Δx₁ = Δy₁ · (x - p1ₓ) + p1ᵧ · Δx₁
+            //  y · Δx₂ = Δy₂ · (x - p3ₓ) + p3ᵧ · Δx₂
+            //
+            // And so,
+            //  y Δx₁ = Δy₁ x - Δy₁ p1ₓ + p1ᵧ Δx₁
+            //  y Δx₂ = Δy₂ x - Δy₂ p3ₓ + p3ᵧ Δx₂
+            //
+            // We want to find (x, y) that satisfy the system of equations.
+
+            if (p2.y == p1.y) {
+                // ( y ) ( p2ₓ - p1ₓ ) = 0 + p1ᵧ · ( p2ₓ - p1ₓ )
+                // Assuming p2ₓ ≠ p1ₓ, y = p1ᵧ. Even if p2ₓ = p1ₓ, it still
+                // makes sense for y = p1ᵧ. In this case, the only point in our
+                // line segment is (p1ₓ, p1ᵧ).
+                y = p1.y;
+            }
+            else if (p4.y == p3.y) {
+                y = p3.y;
+            }
+            else {
+                // We have p2ᵧ ≠ p1ᵧ, so we can divide by p2ᵧ - p1ᵧ = Δy₁ in
+                //   y Δx₁ = Δy₁ x - Δy₁ p1ₓ + p1ᵧ Δx₁
+                //⇒ y Δx₁/Δy₁ = x - p1ₓ + p1ᵧ Δx₁/Δy₁
+                //⇒ x = y Δx₁/Δy₁ + p1ₓ - p1ᵧ Δx₁/Δy₁
+                let m1 = (p2.x - p1.x) / (p2.y - p1.y); // = Δx₁/Δy₁
+                let m2 = (p4.x - p3.x) / (p4.y - p3.y); // = Δx₂/Δy₂
+                //
+                //⇒ x = y m₁ + p1ₓ - p1ᵧ m₁
+                //  and, similarly,
+                //  x = y m₂ + p3ₓ - p3ᵧ m₂
+                //
+                // Therefore,
+                //  y m₁ + p1ₓ - p1ᵧ m₁ = y m₂ + p3ₓ - p3ᵧ m₂
+                //⇒ y m₁ - y m₂ = p1ᵧ m₁ - p1ₓ + p3ₓ - p3ᵧ m₂
+                //⇒ (y) ( m₁ - m₂ ) = p1ᵧ m₁ - p1ₓ + p3ₓ - p3ᵧ m₂
+                //⇒ y = (p1ᵧ m₁ - p1ₓ + p3ₓ - p3ᵧ m₂) / ( m₁ - m₂ ) if m₁ ≠ m₂
+                if (m1 == m2) {
+
+                    // All points intersect!
+                    y = (p1.y + p2.y) / 2;
+                }
+                else {
+                    y = ( p1.y * m1 - p1.x + p3.x - p3.y * m2 ) / ( m1 - m2 );
+                }
+            }
+
+            if (p2.x == p1.x) {
+                x = p2.x;
+            }
+            else {
+                // We can use point-slope formula!
+                //TODO
+            }
+
+            // Test: Is the point actually in L(p3, p4)?
+            if (x >= Math.min(p3.x, p4.x) && x <= Math.max(p3.x, p4.x)) {
+                if (y >= Math.min(p3.y, p4.y) && y <= Math.max(p3.y, p4.y)) {
+                    // Test: Is the point in L(p1, p2)?
+                    if (x >= Math.min(p1.x, p2.x) && x <= Math.max(p3.x, p4.x)) {
+                        if (y >= Math.min(p3.y, p4.y) && y <= Math.max(p3.y, p4.y)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // No intersection.
+        return false;
+    };
+
+    /**
+     * Remove this stroke from the document.
+     * @return EraseAction
+     */
+    Stroke.prototype.remove = function() {
+        ; // → EraseAction
+    };
+
+    function StrokeBuilder() {
+        this.points = [];
+        this.svgPath = [];
+    }
+
+    StrokeBuilder.prototype.addPoint = function(point) {
+
+    };
+
+    StrokeBuilder.prototype.build = function(point) {
+        ; // → StrokeAction
+    };
+
+    StrokeBuilder.prototype.cancel = function() {
+
+    };
+
+    function Tool() {
+        ;
+    }
+
+    Tool.prototype.startStroke = function(point) {
+        ; // → StrokeBuilder
+    };
+
+    function Model() {
+        this.strokes = [];
+    }
 
     /**
      * Add canvases to, otherwise prepare the given element to be annotated.
