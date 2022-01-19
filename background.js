@@ -31,8 +31,13 @@ chrome.browserAction.onClicked.addListener(async (tab) => {
         file: "/content/controls.js",
     });
 
-    sendMessage({ command: "setToolColor", value: localStorage.getItem("toolColor") || "#f00"}, tab.id);
-    sendMessage({ command: "setToolThickness", value: localStorage.getItem("toolThickness") || 0.5}, tab.id);
+    let toolColor = localStorage.getItem("toolColor") ?? "#f00";
+    let toolThickness = localStorage.getItem("toolThickness") ?? 0.5;
+    let touchDraw = localStorage.getItem("touchDrawEnabled") ?? "true";
+
+    sendMessage({ command: "setToolColor", value: toolColor }, tab.id);
+    sendMessage({ command: "setToolThickness", value: toolThickness }, tab.id);
+    sendMessage({ command: "setTouchDrawEnabled", value: touchDraw == "true" }, tab.id);
 });
 
 chrome.runtime.onMessage.addListener(async (message) => {
@@ -45,8 +50,13 @@ chrome.runtime.onMessage.addListener(async (message) => {
         case "setToolThickness":
             localStorage.setItem("toolThickness", message.value);
             break;
+        case "setTouchDrawEnabled":
+            localStorage.setItem("touchDrawEnabled", message.value);
+            break;
         case "setDrawingMode":
             break;
+        default:
+            console.warn(`Unknown message.`, message);
 	}
 
     if (message.forward) {

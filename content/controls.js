@@ -126,6 +126,10 @@
             flex-grow: 0;
         }
 
+        div.${CSS_PREFIX}toolbox label {
+            display: inline;
+        }
+
         @media print {
             .${CSS_PREFIX}toolbox {
                 display: none;
@@ -143,9 +147,9 @@
     `;
 
     /**
-    * @param condition (bool) Throws an error if !condition
-    * @param description (String) Description printed if the assertion fails.
-    */
+     * @param condition (bool) Throws an error if !condition
+     * @param description (String) Description printed if the assertion fails.
+     */
     function assert(condition, description) {
         if (!condition) {
             console.error(`Assertion failed: ${description || 'No description'}.`);
@@ -797,7 +801,7 @@
 
     let controlsContainer = document.createElement("div");
     let toolbox;
-    let toolColor, toolThickness;
+    let toolColor, toolThickness, touchDrawEnabled;
 
     toolbox = new ToolboxBuilder()
         .addItem(new ToolItem("Eraser Tool", "eraser.svg", () => {
@@ -915,20 +919,6 @@
 
             updatePreview();
         }))
-        .addItem(new ToolItem("Save", "save.svg", () => {
-            alert('not implemented');
-            sendMessage({
-                command: "save",
-                forward: true,
-            });
-        }))
-        .addItem(new ToolItem("Open", "open.svg", () => {
-            alert('not implemented');
-            sendMessage({
-                command: "open",
-                forward: true,
-            });
-        }))
         .addItem(new ToolItem("Pencil", "pencil.svg", () => {
             alert('not implemented');
             sendMessage({
@@ -936,6 +926,40 @@
                 value: "pencil",
                 forward: true,
             });
+        }))
+        .addItem(new ToolItem("Marker", "todo.svg", () => {
+            alert('not implemented');
+            sendMessage({
+                command: "setDrawingMode",
+                value: "marker",
+                forward: true,
+            });
+        }))
+        .addItem(new ToolItem("More", "todo.svg", () => {
+            const container = document.createElement("div");
+            const labelElem = document.createElement("label");
+            const touchDrawingCheckbox = document.createElement("input");
+            const firstRow = document.createElement("div");
+
+            touchDrawingCheckbox.id = `${CSS_PREFIX}touchDrawingCheckbox`;
+            touchDrawingCheckbox.type = 'checkbox';
+            labelElem['for'] = touchDrawingCheckbox.id;
+
+            labelElem.appendChild(document.createTextNode(`Enable Touch Drawing`));
+            touchDrawingCheckbox.checked = touchDrawEnabled;
+
+            touchDrawingCheckbox.onchange = touchDrawingCheckbox.oninput = () => {
+                touchDrawEnabled = touchDrawingCheckbox.checked;
+                sendMessage({
+                    command: "setTouchDrawEnabled",
+                    value: touchDrawEnabled,
+                    forward: true,
+                });
+            };
+
+            firstRow.replaceChildren(touchDrawingCheckbox, labelElem);
+            container.appendChild(firstRow);
+            toolbox.showDialog(container);
         }))
         .build();
     let controls = toolbox.container;
@@ -955,6 +979,8 @@
             toolThickness = parseFloat(message.value);
         } else if (message.command === "setToolColor") {
             toolColor = message.value;
+        } else if (message.command === "setTouchDrawEnabled") {
+            touchDrawEnabled = message.value;
         }
     });
 

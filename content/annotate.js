@@ -2,6 +2,8 @@
 
 // Begin namespace
 (async () => {
+    const IS_MOBILE_FIREFOX = (navigator.userAgent || "").indexOf("Mobile") > 0;
+
     // Canvas height: 1024 px at maximum.
     const CANVAS_MAX_HEIGHT = 256;
     const CSS_PREFIX = `_ANNOTATOR__`;
@@ -58,7 +60,7 @@
             top: 0;
             left: 0;
             right: 0;
-            touch-action: pinch-zoom;
+            /* touch-action: pinch-zoom; */
             z-index: ${Z_IDX_MAGNITUDE};
         }
 
@@ -76,7 +78,7 @@
         }
 
         .${CSS_PREFIX}noTouchScroll, .${CSS_PREFIX}noTouchScroll * {
-            touch-action: pinch-zoom !important;
+            /* touch-action: pinch-zoom !important; */
         }
 
         :not(.${CSS_PREFIX}noTouchScroll) .${CSS_PREFIX}strokeElem {
@@ -221,9 +223,8 @@
                 //⇒ (y) ( m₁ - m₂ ) = p1ᵧ m₁ - p1ₓ + p3ₓ - p3ᵧ m₂
                 //⇒ y = (p1ᵧ m₁ - p1ₓ + p3ₓ - p3ᵧ m₂) / ( m₁ - m₂ ) if m₁ ≠ m₂
                 if (m1 == m2) {
-
                     // All points intersect!
-                    y = (p1.y + p2.y) / 2;
+                    y = ( p1.y + p2.y ) / 2;
                 }
                 else {
                     y = ( p1.y * m1 - p1.x + p3.x - p3.y * m2 ) / ( m1 - m2 );
@@ -567,6 +568,7 @@
             });
         };
 
+        let touchDrawEnabled = true;
         const shouldIgnoreEvent = (evt) => {
             if (!acceptingInput) {
                 return true;
@@ -592,8 +594,16 @@
             }
         };
 
+        let isPen = false;
         inputArea.addEventListener("pointerdown", (evt) => {
             if (shouldIgnoreEvent(evt)) {
+                return;
+            }
+
+            isPen = (evt.pointerType === "pen" || (evt.width === 0 && IS_MOBILE_FIREFOX));
+
+            // Pass through touch events if they should scroll the page
+            if (evt.pointerType === "touch" && !isPen && !touchDrawEnabled) {
                 return;
             }
 
@@ -604,6 +614,18 @@
 
             pointersDown[evt.pointerId] = true;
         });
+
+        // Ref: https://stackoverflow.com/a/49375331
+        inputArea.addEventListener("touchstart", (evt) => {
+            if (shouldIgnoreEvent(evt)) {
+                return;
+            }
+
+            if (isPen || touchDrawEnabled) {
+                evt.preventDefault();
+                evt.stopPropagation();
+            }
+        }, { passive: false, capture: false });
 
         inputArea.addEventListener("pointermove", (evt) => {
             if (shouldIgnoreEvent(evt)) {
@@ -655,6 +677,9 @@
             } else if (message.command === "setDrawingMode") {
                 acceptingInput = message.value != 'mouse';
                 setTouchScrolls(!acceptingInput);
+            } else if (message.command === "setTouchDrawEnabled") {
+                touchDrawEnabled = message.value;
+                setTouchScrolls(!message.value);
             }
         });
 
