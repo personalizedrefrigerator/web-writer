@@ -1,6 +1,6 @@
 # Annotator Extension
 
-Write on websites! Moved to https://github.com/UWAppDev/extension-web-writer
+Write on websites!
 
 # Why the `<all_urls>` permission?
 
